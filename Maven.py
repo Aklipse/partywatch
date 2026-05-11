@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+
+from collections import defaultdict
 from streamlit_autorefresh import st_autorefresh
 
 from partywatch import (
@@ -93,6 +95,24 @@ def option_sync_level(option, your_level):
     return min([your_level] + [s["level"] for _, s in option["party"]])
 
 
+def count_level_75_jobs(seeker):
+    jobs = seeker.get("raw", {}).get("jobs", {})
+    count_75 = 0
+
+    if isinstance(jobs, dict):
+        for _, job_level in jobs.items():
+            try:
+                if int(job_level) == 75:
+                    count_75 += 1
+            except (TypeError, ValueError):
+                pass
+
+    if count_75 == 0 and seeker.get("level") == 75:
+        count_75 = 1
+
+    return count_75
+
+
 st.markdown("""
 <style>
 .stApp {
@@ -105,7 +125,6 @@ section[data-testid="stSidebar"] {
     background: rgba(7, 10, 16, 0.96);
 }
 
-/* TIGHTER SIDEBAR SPACING */
 section[data-testid="stSidebar"] .block-container {
     padding-top: 1rem;
 }
@@ -183,10 +202,23 @@ div[data-testid="stTextInput"] {
     padding: 8px;
 }
 
-/* Make labels pop more */
 label[data-testid="stWidgetLabel"] p {
     font-size: 15px !important;
     font-weight: 700 !important;
+}
+
+.player-hover-name {
+    font-size:20px;
+    font-weight:900;
+    margin-bottom:4px;
+    line-height:1.1;
+}
+
+.level75-count {
+    font-size:14px;
+    color:#f7e7bd;
+    font-weight:800;
+    opacity:0.9;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -197,7 +229,7 @@ st.markdown("""
     <div class="maven-logo-bottom">Party Optimizer</div>
 </div>
 <div class="subtitle">
-HorizonXI live seeker optimizer · skillchain-aware scoring · role compression
+HorizonXI Live Party Optimzer
 </div>
 """, unsafe_allow_html=True)
 
@@ -213,10 +245,9 @@ st_autorefresh(
     key="partywatch_refresh",
 )
 
-# YOUR JOB MOVED ABOVE PARTY SYNC FILTER
 current_job = st.sidebar.text_input(
     "Your job",
-    value="BRD",
+    value="",
 ).upper().strip()
 
 party_sync_filter_placeholder = st.sidebar.empty()
@@ -239,7 +270,6 @@ min_level = st.sidebar.number_input(
 
 max_level = min(75, your_level + 10)
 
-# JOB FILTERS MOVED CLOSER TO MINIMUM PARTY LEVEL ACCEPTED
 st.sidebar.subheader("Job Filters")
 
 selected_jobs_by_role = {}
@@ -279,10 +309,15 @@ def seeker_allowed_for_any_role(seeker):
 
 
 with st.spinner("Fetching HorizonXI seekers..."):
-    seekers = fetch_seekers()
+    all_seekers_raw = fetch_seekers()
+
+level_75_count_by_name = {
+    s["name"].lower(): count_level_75_jobs(s)
+    for s in all_seekers_raw
+}
 
 seekers = [
-    s for s in seekers
+    s for s in all_seekers_raw
     if min_level <= s["level"] <= max_level
 ]
 
@@ -439,15 +474,21 @@ else:
                             color=badge_color,
                         )
 
+                        level_75_count = level_75_count_by_name.get(
+                            member["Name"].lower(),
+                            0,
+                        )
+
+                        level_75_text = (
+                            ""
+                            if member["Name"] == "You"
+                            else f" <span class='level75-count'>(75: {level_75_count})</span>"
+                        )
+
                         st.markdown(
                             f"""
-                            <div style="
-                                font-size:20px;
-                                font-weight:900;
-                                margin-bottom:4px;
-                                line-height:1.1;
-                            ">
-                                {member['Name']}
+                            <div class="player-hover-name">
+                                {member['Name']}{level_75_text}
                             </div>
                             """,
                             unsafe_allow_html=True,
@@ -502,6 +543,7 @@ if seekers:
             "Main": s["main"],
             "Sub": s["sub"],
             "Level": s["level"],
+            "75 Jobs Seeking": level_75_count_by_name.get(s["name"].lower(), 0),
         }
         for s in seekers
     ]
@@ -545,7 +587,8 @@ for role in roles:
                     with st.container(border=True):
                         st.caption(role_label(role))
 
-                        st.markdown(f"**{s['name']}**")
+                        count_75 = level_75_count_by_name.get(s["name"].lower(), 0)
+                        st.markdown(f"**{s['name']}** `(75: {count_75})`")
 
                         st.markdown(
                             f"{job_icon(s['main'])} "

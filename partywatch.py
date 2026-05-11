@@ -13,7 +13,7 @@ ROLES = {
     "support": {"BRD", "RDM", "SMN"},
     "puller": {"BRD", "THF"},
     "dd(voke)": {"WAR", "NIN", "PLD"},
-    "dd": {"WAR", "MNK", "DRK", "RNG", "SAM", "DRG", "BST"},
+    "dd": {"WAR", "MNK", "DRK", "RNG", "SAM", "DRG", "BST","THF"},
 }
 
 
