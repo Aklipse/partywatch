@@ -100,39 +100,73 @@ st.markdown("""
         radial-gradient(circle at top left, rgba(80,120,180,0.20), transparent 35%),
         linear-gradient(135deg, #070b10 0%, #111827 50%, #090b10 100%);
 }
+
 section[data-testid="stSidebar"] {
     background: rgba(7, 10, 16, 0.96);
 }
+
+/* TIGHTER SIDEBAR SPACING */
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 1rem;
+}
+
+section[data-testid="stSidebar"] hr {
+    margin-top: 0.35rem !important;
+    margin-bottom: 0.35rem !important;
+}
+
+section[data-testid="stSidebar"] .stNumberInput,
+section[data-testid="stSidebar"] .stTextInput,
+section[data-testid="stSidebar"] .stSelectbox {
+    margin-bottom: 0.15rem !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stExpander"] {
+    margin-top: 0.15rem !important;
+    margin-bottom: 0.15rem !important;
+}
+
+section[data-testid="stSidebar"] h3 {
+    margin-top: 0.35rem !important;
+    margin-bottom: 0.35rem !important;
+}
+
 .maven-logo {
     line-height: .9;
     margin-bottom: 8px;
 }
+
 .maven-logo-top {
     font-size: 44px;
     font-weight: 900;
     color: #f7e7bd;
     letter-spacing: 1px;
 }
+
 .maven-logo-bottom {
     font-size: 30px;
     font-weight: 800;
     color: #7cc7ff;
     letter-spacing: 2px;
 }
+
 .subtitle {
     color: #d4c2a1;
     margin-bottom: 20px;
 }
+
 div[data-testid="stMetric"] {
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(247,231,189,0.14);
     padding: 12px;
     border-radius: 16px;
 }
+
 div[data-testid="stVerticalBlockBorderWrapper"] {
     background: rgba(255,255,255,0.04);
     border-radius: 16px;
 }
+
 /* PARTY SYNC FILTER */
 div[data-testid="stSelectbox"]:has(div[data-baseweb="select"]) {
     background: rgba(120, 25, 25, 0.22);
@@ -179,6 +213,12 @@ st_autorefresh(
     key="partywatch_refresh",
 )
 
+# YOUR JOB MOVED ABOVE PARTY SYNC FILTER
+current_job = st.sidebar.text_input(
+    "Your job",
+    value="BRD",
+).upper().strip()
+
 party_sync_filter_placeholder = st.sidebar.empty()
 
 your_level = st.sidebar.number_input(
@@ -197,16 +237,9 @@ min_level = st.sidebar.number_input(
     default_min_level,
 )
 
-current_job = st.sidebar.text_input(
-    "Your job",
-    value="BRD",
-).upper().strip()
-
 max_level = min(75, your_level + 10)
 
-st.sidebar.write(f"Search range: Lv{min_level}-{max_level}")
-
-st.sidebar.divider()
+# JOB FILTERS MOVED CLOSER TO MINIMUM PARTY LEVEL ACCEPTED
 st.sidebar.subheader("Job Filters")
 
 selected_jobs_by_role = {}
