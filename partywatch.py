@@ -13,7 +13,7 @@ ROLES = {
     "support": {"BRD", "RDM", "SMN"},
     "puller": {"BRD", "THF"},
     "dd(voke)": {"WAR", "NIN", "PLD"},
-    "dd": {"WAR", "MNK", "DRK", "RNG", "SAM", "DRG", "BST","THF"},
+    "dd": {"WAR", "MNK", "DRK", "RNG", "SAM", "DRG", "BST", "THF"},
 }
 
 
@@ -257,6 +257,7 @@ def dd_priority_value(job, sync_level):
             "SAM": 75,
             "DRK": 65,
             "BST": 45,
+            "THF": 50,
         }
     else:
         values = {
@@ -267,6 +268,7 @@ def dd_priority_value(job, sync_level):
             "BST": 70,
             "DRK": 60,
             "RNG": 40,
+            "THF": 45,
         }
 
     return values.get(job, 0)
@@ -601,8 +603,25 @@ def is_valid_final_party(current_job, your_level, your_role, assignments, minimu
     return True
 
 
-def build_party_options(seekers, current_job, your_level, minimum_party_level, role_filters=None):
+def build_party_options(
+    seekers,
+    current_job,
+    your_level,
+    minimum_party_level,
+    role_filters=None,
+    forced_seekers=None,
+):
     all_options = []
+
+    forced_seekers = forced_seekers or []
+
+    forced_names = {
+        s["name"].lower()
+        for s in forced_seekers
+    }
+
+    if len(forced_names) > 5:
+        return []
 
     for your_role in possible_your_roles(current_job, your_level):
         roles_needed = needed_roles_for_your_role(your_role, current_job)
@@ -622,6 +641,14 @@ def build_party_options(seekers, current_job, your_level, minimum_party_level, r
                 ):
                     return
 
+                assignment_names = {
+                    seeker["name"].lower()
+                    for _, seeker in assignments
+                }
+
+                if not forced_names.issubset(assignment_names):
+                    return
+
                 score, archetype, reasons = score_party(
                     current_job,
                     your_level,
@@ -636,6 +663,7 @@ def build_party_options(seekers, current_job, your_level, minimum_party_level, r
                     "archetype": archetype,
                     "reasons": reasons,
                 })
+
                 return
 
             role = roles_needed[index]
@@ -646,7 +674,12 @@ def build_party_options(seekers, current_job, your_level, minimum_party_level, r
                 if key in used_names:
                     continue
 
-                test_levels = [your_level] + [s["level"] for _, s in assignments] + [seeker["level"]]
+                test_levels = (
+                    [your_level]
+                    + [s["level"] for _, s in assignments]
+                    + [seeker["level"]]
+                )
+
                 test_sync = min(test_levels)
                 test_max = max(test_levels)
 
@@ -675,7 +708,10 @@ def build_party_options(seekers, current_job, your_level, minimum_party_level, r
 
         backtrack(0, set(), [])
 
-    all_options.sort(key=lambda option: option["score"], reverse=True)
+    all_options.sort(
+        key=lambda option: option["score"],
+        reverse=True,
+    )
 
     clean = []
     seen = set()
@@ -684,7 +720,11 @@ def build_party_options(seekers, current_job, your_level, minimum_party_level, r
     for option in all_options:
         your_role = option["your_role"]
         party = option["party"]
-        level_sync = min([your_level] + [s["level"] for _, s in party])
+
+        level_sync = min(
+            [your_level]
+            + [s["level"] for _, s in party]
+        )
 
         party_key = (
             your_role,
@@ -708,6 +748,7 @@ def build_party_options(seekers, current_job, your_level, minimum_party_level, r
 
         seen.add(party_key)
         per_sync_count[level_sync] += 1
+
         clean.append(option)
 
     return clean

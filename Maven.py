@@ -332,24 +332,46 @@ seekers = [
 st.sidebar.subheader("Available Seekers")
 
 included_seekers = []
+forced_seekers = []
 
-with st.sidebar.expander("Uncheck seekers to exclude", expanded=False):
+with st.sidebar.expander("Include / Force Seekers", expanded=False):
     if seekers:
         for s in sorted(seekers, key=lambda x: x["name"].lower()):
-            seeker_key = f"include_seeker_{s['name'].lower()}_{s['main']}_{s['level']}"
+            base_key = f"{s['name'].lower()}_{s['main']}_{s['level']}"
 
-            included = st.checkbox(
-                f"{job_icon(s['main'])} {s['name']} — {s['job']} Lv{s['level']}",
-                value=True,
-                key=seeker_key,
-            )
+            st.caption(f"{job_icon(s['main'])} {s['name']} — {s['job']} Lv{s['level']}")
+
+            cols = st.columns([1, 1])
+
+            with cols[0]:
+                included = st.checkbox(
+                    "Include",
+                    value=True,
+                    key=f"include_seeker_{base_key}",
+                )
+
+            with cols[1]:
+                forced = st.checkbox(
+                    "Force",
+                    value=False,
+                    key=f"force_seeker_{base_key}",
+                )
+
+            if forced:
+                included = True
+                forced_seekers.append(s)
 
             if included:
                 included_seekers.append(s)
+
+            st.divider()
     else:
         st.caption("No seekers available with current filters.")
 
 seekers = included_seekers
+
+if len(forced_seekers) > 5:
+    st.sidebar.error("You can only force up to 5 seekers because you are the 6th party member.")
 
 try:
     all_options = build_party_options(
@@ -358,6 +380,7 @@ try:
         your_level,
         min_level,
         selected_jobs_by_role,
+        forced_seekers,
     )
 except Exception as e:
     st.error(f"Could not build parties: {e}")
@@ -566,8 +589,9 @@ if seekers:
             "Sub": s["sub"],
             "Level": s["level"],
             "75 Jobs Seeking": level_75_count_by_name.get(s["name"].lower(), 0),
+            "Forced": "Yes" if s["name"].lower() in {fs["name"].lower() for fs in forced_seekers} else "",
         }
-        for s in seekers
+        for s in sorted(seekers, key=lambda x: x["name"].lower())
     ]
 
     st.dataframe(
@@ -604,13 +628,15 @@ for role in roles:
         if matches:
             cols = st.columns(4)
 
-            for idx, s in enumerate(matches):
+            for idx, s in enumerate(sorted(matches, key=lambda x: x["name"].lower())):
                 with cols[idx % 4]:
                     with st.container(border=True):
                         st.caption(role_label(role))
 
                         count_75 = level_75_count_by_name.get(s["name"].lower(), 0)
-                        st.markdown(f"**{s['name']}** `(75: {count_75})`")
+                        forced_label = " 🔒" if s["name"].lower() in {fs["name"].lower() for fs in forced_seekers} else ""
+
+                        st.markdown(f"**{s['name']}{forced_label}** `(75: {count_75})`")
 
                         st.markdown(
                             f"{job_icon(s['main'])} "
