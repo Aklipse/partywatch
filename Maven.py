@@ -329,6 +329,28 @@ seekers = [
     if seeker_allowed_for_any_role(s)
 ]
 
+st.sidebar.subheader("Available Seekers")
+
+included_seekers = []
+
+with st.sidebar.expander("Uncheck seekers to exclude", expanded=False):
+    if seekers:
+        for s in sorted(seekers, key=lambda x: x["name"].lower()):
+            seeker_key = f"include_seeker_{s['name'].lower()}_{s['main']}_{s['level']}"
+
+            included = st.checkbox(
+                f"{job_icon(s['main'])} {s['name']} — {s['job']} Lv{s['level']}",
+                value=True,
+                key=seeker_key,
+            )
+
+            if included:
+                included_seekers.append(s)
+    else:
+        st.caption("No seekers available with current filters.")
+
+seekers = included_seekers
+
 try:
     all_options = build_party_options(
         seekers,
