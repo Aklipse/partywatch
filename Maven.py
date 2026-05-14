@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 
-from collections import defaultdict
 from streamlit_autorefresh import st_autorefresh
 
 from partywatch import (
@@ -113,6 +112,23 @@ def count_level_75_jobs(seeker):
     return count_75
 
 
+def best_party_signature(option, your_level):
+    if not option:
+        return None
+
+    members = [
+        f"{role}:{s['name']}:{s['job']}:{s['level']}"
+        for role, s in option["party"]
+    ]
+
+    return "|".join([
+        option.get("archetype", ""),
+        str(option.get("score", "")),
+        str(option_sync_level(option, your_level)),
+        *sorted(members),
+    ])
+
+
 st.markdown("""
 <style>
 .stApp {
@@ -186,7 +202,6 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     border-radius: 16px;
 }
 
-/* PARTY SYNC FILTER */
 div[data-testid="stSelectbox"]:has(div[data-baseweb="select"]) {
     background: rgba(120, 25, 25, 0.22);
     border: 1px solid rgba(255, 80, 80, 0.30);
@@ -194,7 +209,6 @@ div[data-testid="stSelectbox"]:has(div[data-baseweb="select"]) {
     padding: 8px;
 }
 
-/* YOUR JOB INPUT */
 div[data-testid="stTextInput"] {
     background: rgba(25, 90, 45, 0.22);
     border: 1px solid rgba(80, 255, 140, 0.28);
@@ -244,6 +258,31 @@ st_autorefresh(
     interval=refresh_minutes * 60 * 1000,
     key="partywatch_refresh",
 )
+
+st.sidebar.subheader("Best Party Alerts")
+
+alerts_enabled = st.sidebar.toggle(
+    "Enable Alerts",
+    value=True,
+    key="alerts_enabled",
+)
+
+if alerts_enabled:
+    with st.sidebar.expander("Alert Options", expanded=False):
+        alert_sound_enabled = st.toggle(
+            "Wind chime sound",
+            value=True,
+            key="alert_sound_enabled",
+        )
+
+        alert_popup_enabled = st.toggle(
+            "Pop-up overlay",
+            value=True,
+            key="alert_popup_enabled",
+        )
+else:
+    alert_sound_enabled = False
+    alert_popup_enabled = False
 
 current_job = st.sidebar.text_input(
     "Your job",
@@ -426,6 +465,74 @@ if options:
     best_sync = option_sync_level(best_option, your_level)
     best_score = best_option["score"]
 
+    current_best_signature = best_party_signature(best_option, your_level)
+    previous_best_signature = st.session_state.get("previous_best_signature")
+
+    new_best_available = (
+        previous_best_signature is not None
+        and current_best_signature != previous_best_signature
+    )
+
+    st.session_state["previous_best_signature"] = current_best_signature
+
+    if alerts_enabled and new_best_available:
+        st.toast("🔔 New best party option available!", icon="🎵")
+
+        sound_html = ""
+        popup_html = ""
+
+        if alert_sound_enabled:
+            sound_html = """
+            <iframe 
+                src="https://actions.google.com/sounds/v1/foley/wind_chimes.ogg" 
+                allow="autoplay" 
+                style="display:none">
+            </iframe>
+
+            <audio autoplay>
+                <source src="https://actions.google.com/sounds/v1/foley/wind_chimes.ogg" type="audio/ogg">
+            </audio>
+            """
+
+        if alert_popup_enabled:
+            popup_html = """
+            <div style="
+                position: fixed;
+                top: 90px;
+                right: 24px;
+                z-index: 999999;
+                background: rgba(20, 28, 40, 0.96);
+                color: #f7e7bd;
+                border: 2px solid rgba(124,199,255,0.75);
+                border-radius: 18px;
+                padding: 18px 22px;
+                box-shadow: 0 10px 35px rgba(0,0,0,0.45);
+                font-size: 18px;
+                font-weight: 900;
+                animation: fadeOut 7s forwards;
+            ">
+                🔔 New Best Party Option Available!
+                <div style="font-size:13px; font-weight:600; color:#d4c2a1; margin-top:6px;">
+                    Check the top party result.
+                </div>
+            </div>
+
+            <style>
+            @keyframes fadeOut {
+                0% { opacity: 1; transform: translateY(0); }
+                75% { opacity: 1; transform: translateY(0); }
+                100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+            }
+            </style>
+            """
+
+        st.markdown(
+            sound_html + popup_html,
+            unsafe_allow_html=True,
+        )
+else:
+    st.session_state["previous_best_signature"] = None
+
 sync_levels_text = ", ".join(str(lvl) for lvl in available_sync_levels) or "-"
 
 metric_cols = st.columns(4)
@@ -580,6 +687,8 @@ st.divider()
 st.subheader("Available Seekers")
 
 if seekers:
+    forced_names = {fs["name"].lower() for fs in forced_seekers}
+
     seeker_rows = [
         {
             "Icon": job_icon(s["main"]),
@@ -589,7 +698,7 @@ if seekers:
             "Sub": s["sub"],
             "Level": s["level"],
             "75 Jobs Seeking": level_75_count_by_name.get(s["name"].lower(), 0),
-            "Forced": "Yes" if s["name"].lower() in {fs["name"].lower() for fs in forced_seekers} else "",
+            "Forced": "Yes" if s["name"].lower() in forced_names else "",
         }
         for s in sorted(seekers, key=lambda x: x["name"].lower())
     ]
@@ -627,6 +736,7 @@ for role in roles:
     ):
         if matches:
             cols = st.columns(4)
+            forced_names = {fs["name"].lower() for fs in forced_seekers}
 
             for idx, s in enumerate(sorted(matches, key=lambda x: x["name"].lower())):
                 with cols[idx % 4]:
@@ -634,7 +744,7 @@ for role in roles:
                         st.caption(role_label(role))
 
                         count_75 = level_75_count_by_name.get(s["name"].lower(), 0)
-                        forced_label = " 🔒" if s["name"].lower() in {fs["name"].lower() for fs in forced_seekers} else ""
+                        forced_label = " 🔒" if s["name"].lower() in forced_names else ""
 
                         st.markdown(f"**{s['name']}{forced_label}** `(75: {count_75})`")
 
