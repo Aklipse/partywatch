@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 
 from streamlit_autorefresh import st_autorefresh
@@ -127,6 +128,53 @@ def best_party_signature(option, your_level):
         str(option_sync_level(option, your_level)),
         *sorted(members),
     ])
+
+
+def play_wind_chime_sound():
+    components.html(
+        """
+        <script>
+        (() => {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioContext();
+
+                if (ctx.state === "suspended") {
+                    ctx.resume();
+                }
+
+                const now = ctx.currentTime;
+
+                function chime(freq, delay, gainValue) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc.type = "sine";
+                    osc.frequency.value = freq;
+
+                    gain.gain.setValueAtTime(0.0001, now + delay);
+                    gain.gain.linearRampToValueAtTime(gainValue, now + delay + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 2.5);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(now + delay);
+                    osc.stop(now + delay + 2.5);
+                }
+
+                chime(880, 0.00, 0.045);
+                chime(1174, 0.18, 0.035);
+                chime(1567, 0.36, 0.028);
+            } catch (e) {
+                console.log(e);
+            }
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
 
 
 st.markdown("""
@@ -478,58 +526,43 @@ if options:
     if alerts_enabled and new_best_available:
         st.toast("🔔 New best party option available!", icon="🎵")
 
-        sound_html = ""
-        popup_html = ""
-
         if alert_sound_enabled:
-            sound_html = """
-            <iframe 
-                src="https://actions.google.com/sounds/v1/foley/wind_chimes.ogg" 
-                allow="autoplay" 
-                style="display:none">
-            </iframe>
-
-            <audio autoplay>
-                <source src="https://actions.google.com/sounds/v1/foley/wind_chimes.ogg" type="audio/ogg">
-            </audio>
-            """
+            play_wind_chime_sound()
 
         if alert_popup_enabled:
-            popup_html = """
-            <div style="
-                position: fixed;
-                top: 90px;
-                right: 24px;
-                z-index: 999999;
-                background: rgba(20, 28, 40, 0.96);
-                color: #f7e7bd;
-                border: 2px solid rgba(124,199,255,0.75);
-                border-radius: 18px;
-                padding: 18px 22px;
-                box-shadow: 0 10px 35px rgba(0,0,0,0.45);
-                font-size: 18px;
-                font-weight: 900;
-                animation: fadeOut 7s forwards;
-            ">
-                🔔 New Best Party Option Available!
-                <div style="font-size:13px; font-weight:600; color:#d4c2a1; margin-top:6px;">
-                    Check the top party result.
+            st.markdown(
+                """
+                <div style="
+                    position: fixed;
+                    top: 90px;
+                    right: 24px;
+                    z-index: 999999;
+                    background: rgba(20, 28, 40, 0.96);
+                    color: #f7e7bd;
+                    border: 2px solid rgba(124,199,255,0.75);
+                    border-radius: 18px;
+                    padding: 18px 22px;
+                    box-shadow: 0 10px 35px rgba(0,0,0,0.45);
+                    font-size: 18px;
+                    font-weight: 900;
+                    animation: fadeOut 7s forwards;
+                ">
+                    🔔 New Best Party Option Available!
+                    <div style="font-size:13px; font-weight:600; color:#d4c2a1; margin-top:6px;">
+                        Check the top party result.
+                    </div>
                 </div>
-            </div>
 
-            <style>
-            @keyframes fadeOut {
-                0% { opacity: 1; transform: translateY(0); }
-                75% { opacity: 1; transform: translateY(0); }
-                100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
-            }
-            </style>
-            """
-
-        st.markdown(
-            sound_html + popup_html,
-            unsafe_allow_html=True,
-        )
+                <style>
+                @keyframes fadeOut {
+                    0% { opacity: 1; transform: translateY(0); }
+                    75% { opacity: 1; transform: translateY(0); }
+                    100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
 else:
     st.session_state["previous_best_signature"] = None
 
