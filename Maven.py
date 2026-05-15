@@ -130,17 +130,67 @@ def best_party_signature(option, your_level):
     ])
 
 
+def unlock_audio_button():
+    components.html(
+        """
+        <button
+            id="enableSoundButton"
+            onclick="
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    const ctx = new AudioContext();
+                    ctx.resume();
+
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.value = 880;
+                    gain.gain.value = 0.001;
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.05);
+
+                    this.innerText = 'Sound Enabled';
+                    this.style.background = '#1f7a3f';
+                    this.style.border = '1px solid #77ff99';
+                } catch (e) {
+                    console.log('Audio unlock failed:', e);
+                    this.innerText = 'Sound Blocked';
+                }
+            "
+            style="
+                width: 100%;
+                background: rgba(124,199,255,0.18);
+                color: #f7e7bd;
+                border: 1px solid rgba(124,199,255,0.55);
+                border-radius: 10px;
+                padding: 8px 10px;
+                font-weight: 800;
+                cursor: pointer;
+            "
+        >
+            Enable Sound
+        </button>
+        """,
+        height=45,
+    )
+
+
 def play_wind_chime_sound():
     components.html(
         """
         <script>
-        (() => {
+        async function playChime() {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 const ctx = new AudioContext();
 
                 if (ctx.state === "suspended") {
-                    ctx.resume();
+                    await ctx.resume();
                 }
 
                 const now = ctx.currentTime;
@@ -163,17 +213,19 @@ def play_wind_chime_sound():
                     osc.stop(now + delay + 2.5);
                 }
 
-                chime(880, 0.00, 0.045);
-                chime(1174, 0.18, 0.035);
-                chime(1567, 0.36, 0.028);
+                chime(880, 0.00, 0.08);
+                chime(1174, 0.18, 0.06);
+                chime(1567, 0.36, 0.045);
             } catch (e) {
-                console.log(e);
+                console.log("Chime failed:", e);
             }
-        })();
+        }
+
+        playChime();
         </script>
         """,
-        height=0,
-        width=0,
+        height=1,
+        width=1,
     )
 
 
@@ -328,6 +380,10 @@ if alerts_enabled:
             value=True,
             key="alert_popup_enabled",
         )
+
+        if alert_sound_enabled:
+            st.caption("Click once after the app loads to allow browser sound.")
+            unlock_audio_button()
 else:
     alert_sound_enabled = False
     alert_popup_enabled = False
