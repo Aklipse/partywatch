@@ -232,9 +232,8 @@ def play_wind_chime_sound():
 st.markdown("""
 <style>
 .stApp {
-    background:
-        radial-gradient(circle at top left, rgba(80,120,180,0.20), transparent 35%),
-        linear-gradient(135deg, #070b10 0%, #111827 50%, #090b10 100%);
+    background: unset;
+    color-scheme: light;
 }
 
 section[data-testid="stSidebar"] {
@@ -309,11 +308,24 @@ div[data-testid="stSelectbox"]:has(div[data-baseweb="select"]) {
     padding: 8px;
 }
 
-div[data-testid="stTextInput"] {
+/* DEFAULT SIDEBAR TEXT INPUTS = GREEN */
+section[data-testid="stSidebar"] div[data-testid="stTextInput"] {
     background: rgba(25, 90, 45, 0.22);
     border: 1px solid rgba(80, 255, 140, 0.28);
     border-radius: 14px;
     padding: 8px;
+}
+
+/* ONLY YOUR NAME FIELD = GOLD */
+section[data-testid="stSidebar"] div[data-testid="stTextInput"]:has(input[aria-label="Your Name"]) {
+    background: rgba(247, 201, 88, 0.18) !important;
+    border: 1px solid rgba(247, 201, 88, 0.60) !important;
+    box-shadow: 0 0 10px rgba(247, 201, 88, 0.18) !important;
+}
+
+/* CLEAN INPUT BACKGROUND */
+section[data-testid="stSidebar"] div[data-testid="stTextInput"] input {
+    background: transparent !important;
 }
 
 label[data-testid="stWidgetLabel"] p {
@@ -337,56 +349,53 @@ label[data-testid="stWidgetLabel"] p {
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-<div class="maven-logo">
-    <div class="maven-logo-top">Maven's</div>
-    <div class="maven-logo-bottom">Party Optimizer</div>
-</div>
-<div class="subtitle">
-HorizonXI Live Party Optimzer
-</div>
-""", unsafe_allow_html=True)
 
-refresh_minutes = st.sidebar.slider(
-    "Refresh every X minutes",
-    1,
-    15,
-    3,
-)
+top_cols = st.columns([1.5, 1.5, 5])
+
+with top_cols[0]:
+    st.markdown("**Enable Sound Alerts**")
+    alert_sound_enabled = st.toggle(
+        "Wind chime",
+        value=True,
+        key="alert_sound_enabled",
+    )
+
+with top_cols[1]:
+    st.markdown("**Refresh Every X Minutes**")
+    refresh_minutes = st.slider(
+        "Refresh every X minutes",
+        1,
+        15,
+        3,
+        key="refresh_minutes_top",
+        label_visibility="collapsed",
+    )
+
+with top_cols[2]:
+    st.markdown("")
 
 st_autorefresh(
     interval=refresh_minutes * 60 * 1000,
     key="partywatch_refresh",
 )
 
-st.sidebar.subheader("Best Party Alerts")
+# Purple-styled Your Name input above job
+st.sidebar.image("assets/ffxiparty_logo.png", width=240)
 
-alerts_enabled = st.sidebar.toggle(
-    "Enable Alerts",
-    value=True,
-    key="alerts_enabled",
-)
+st.sidebar.markdown("""
+<style>
+section[data-testid="stSidebar"] img {
+    display: block;
+    margin: 0 auto 18px auto;
+}
 
-if alerts_enabled:
-    with st.sidebar.expander("Alert Options", expanded=False):
-        alert_sound_enabled = st.toggle(
-            "Wind chime sound",
-            value=True,
-            key="alert_sound_enabled",
-        )
+</style>
+""", unsafe_allow_html=True)
 
-        alert_popup_enabled = st.toggle(
-            "Pop-up overlay",
-            value=True,
-            key="alert_popup_enabled",
-        )
-
-        if alert_sound_enabled:
-            st.caption("Click once after the app loads to allow browser sound.")
-            unlock_audio_button()
-else:
-    alert_sound_enabled = False
-    alert_popup_enabled = False
+your_name = st.sidebar.text_input(
+    "Your Name",
+    value="",
+).strip()
 
 current_job = st.sidebar.text_input(
     "Your job",
@@ -579,46 +588,11 @@ if options:
 
     st.session_state["previous_best_signature"] = current_best_signature
 
-    if alerts_enabled and new_best_available:
+    if new_best_available:
         st.toast("🔔 New best party option available!", icon="🎵")
 
         if alert_sound_enabled:
             play_wind_chime_sound()
-
-        if alert_popup_enabled:
-            st.markdown(
-                """
-                <div style="
-                    position: fixed;
-                    top: 90px;
-                    right: 24px;
-                    z-index: 999999;
-                    background: rgba(20, 28, 40, 0.96);
-                    color: #f7e7bd;
-                    border: 2px solid rgba(124,199,255,0.75);
-                    border-radius: 18px;
-                    padding: 18px 22px;
-                    box-shadow: 0 10px 35px rgba(0,0,0,0.45);
-                    font-size: 18px;
-                    font-weight: 900;
-                    animation: fadeOut 7s forwards;
-                ">
-                    🔔 New Best Party Option Available!
-                    <div style="font-size:13px; font-weight:600; color:#d4c2a1; margin-top:6px;">
-                        Check the top party result.
-                    </div>
-                </div>
-
-                <style>
-                @keyframes fadeOut {
-                    0% { opacity: 1; transform: translateY(0); }
-                    75% { opacity: 1; transform: translateY(0); }
-                    100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
-                }
-                </style>
-                """,
-                unsafe_allow_html=True,
-            )
 else:
     st.session_state["previous_best_signature"] = None
 
@@ -819,29 +793,19 @@ for role in roles:
         and s["main"] in selected_jobs_by_role.get(role, set())
     ]
 
-    with st.expander(
-        f"{role.upper()} — {len(matches)} available",
-        expanded=True,
-    ):
-        if matches:
-            cols = st.columns(4)
-            forced_names = {fs["name"].lower() for fs in forced_seekers}
+    if not matches:
+        continue
 
-            for idx, s in enumerate(sorted(matches, key=lambda x: x["name"].lower())):
-                with cols[idx % 4]:
-                    with st.container(border=True):
-                        st.caption(role_label(role))
+    st.markdown(f"### {role.upper()}")
 
-                        count_75 = level_75_count_by_name.get(s["name"].lower(), 0)
-                        forced_label = " 🔒" if s["name"].lower() in forced_names else ""
+    rows = [
+        {
+            "Name": s["name"],
+            "Job": s["job"],
+            "Main": s["main"],
+            "Level": s["level"],
+        }
+        for s in sorted(matches, key=lambda x: x["name"].lower())
+    ]
 
-                        st.markdown(f"**{s['name']}{forced_label}** `(75: {count_75})`")
-
-                        st.markdown(
-                            f"{job_icon(s['main'])} "
-                            f"`{s['job']}`"
-                        )
-
-                        st.caption(f"Lv{s['level']}")
-        else:
-            st.write("No matches.")
+    st.dataframe(pd.DataFrame(rows), hide_index=True)

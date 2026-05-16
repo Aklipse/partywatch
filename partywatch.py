@@ -1,10 +1,69 @@
 import csv
 import io
 import itertools
+import json
+import subprocess
 import requests
 from collections import defaultdict
 
+try:
+    from urllib3.contrib.pyopenssl import inject_into_urllib3
+    inject_into_urllib3()
+except ImportError:
+    pass
+
 URL = "https://api.horizonxi.com/api/v1/chars/lfp"
+
+def _fetch_text_with_curl(url, timeout=20, headers=None):
+    headers = headers or {}
+    command = [
+        "curl.exe",
+        "--silent",
+        "--show-error",
+        "--location",
+        "--max-time",
+        str(timeout),
+        url,
+    ]
+
+    user_agent = headers.get("User-Agent") or headers.get("user-agent")
+    if user_agent:
+        command += ["--user-agent", user_agent]
+
+    for name, value in headers.items():
+        if name.lower() == "user-agent":
+            continue
+        command += ["-H", f"{name}: {value}"]
+
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout
+    except FileNotFoundError as error:
+        raise RuntimeError(
+            "curl.exe is not available; install curl or add it to PATH"
+        ) from error
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(
+            f"curl.exe failed: {error.stderr.strip() or error}"
+        ) from error
+
+
+def _fetch_text(url, timeout=20, headers=None):
+    headers = headers or {"User-Agent": "Mozilla/5.0"}
+
+    try:
+        response = requests.get(url, timeout=timeout, headers=headers)
+        response.raise_for_status()
+        return response.text
+    except requests.exceptions.SSLError:
+        return _fetch_text_with_curl(url, timeout=timeout, headers=headers)
+    except requests.exceptions.RequestException:
+        return _fetch_text_with_curl(url, timeout=timeout, headers=headers)
 
 PARTY_TEMPLATE = ["healer", "support", "dd(voke)", "puller", "dd", "dd"]
 
@@ -18,16 +77,15 @@ ROLES = {
 
 
 def fetch_seekers():
-    response = requests.get(URL, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-    response.raise_for_status()
+    text = _fetch_text(URL, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
 
     try:
-        data = response.json()
+        data = json.loads(text)
         if isinstance(data, dict):
-            data = data.get("data", data.get("chars", data.get("results", [])))
+            data = data.get("data", data.get("chars", data.get("results", []))) or []
         return [p for row in data if (p := normalize_player(row))]
-    except Exception:
-        reader = csv.DictReader(io.StringIO(response.text.strip()))
+    except (ValueError, TypeError):
+        reader = csv.DictReader(io.StringIO(text.strip()))
         return [p for row in reader if (p := normalize_player(row))]
 
 
