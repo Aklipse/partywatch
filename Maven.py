@@ -550,9 +550,21 @@ sync_filter_choices = ["All sync levels"] + [
     f"Lv{lvl}" for lvl in available_sync_levels
 ]
 
+if (
+    "party_sync_filter" in st.session_state
+    and st.session_state.party_sync_filter not in sync_filter_choices
+):
+    st.session_state.party_sync_filter = "All sync levels"
+
+default_index = sync_filter_choices.index(
+    st.session_state.get("party_sync_filter", "All sync levels")
+)
+
 party_sync_filter = party_sync_filter_placeholder.selectbox(
     "Party sync level filter",
     sync_filter_choices,
+    index=default_index,
+    key="party_sync_filter",
 )
 
 if party_sync_filter != "All sync levels":
