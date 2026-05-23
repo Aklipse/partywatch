@@ -143,6 +143,9 @@ def job_fits_role(main, role, party_sync=None):
     if role == "puller":
         return main in {"BRD", "THF"}
 
+    if role == "support(puller)":
+        return main == "BRD"
+
     if role == "dd(voke)":
         return main in {"WAR", "NIN", "PLD"}
 
@@ -196,6 +199,12 @@ def needed_roles_for_your_role(your_role, current_job=None):
 def role_allowed_by_filter(role, seeker, role_filters):
     if not role_filters:
         return True
+
+    if role == "support(puller)":
+        return (
+            role_allowed_by_filter("support", seeker, role_filters)
+            and role_allowed_by_filter("puller", seeker, role_filters)
+        )
 
     allowed = role_filters.get(role)
 
@@ -684,8 +693,8 @@ def build_party_options(
     for your_role in possible_your_roles(current_job, your_level):
         roles_needed = needed_roles_for_your_role(your_role, current_job)
 
-        def backtrack(index, used_names, assignments):
-            if index >= len(roles_needed):
+        def backtrack(pending_roles, used_names, assignments):
+            if not pending_roles:
                 if len(assignments) != 5:
                     return
 
@@ -724,7 +733,8 @@ def build_party_options(
 
                 return
 
-            role = roles_needed[index]
+            role = pending_roles[0]
+            remaining_roles = pending_roles[1:]
 
             for seeker in seekers:
                 key = seeker["name"].lower()
@@ -756,15 +766,27 @@ def build_party_options(
                 if not role_allowed_by_filter(role, seeker, role_filters):
                     continue
 
-                used_names.add(key)
-                assignments.append((role, seeker))
+                assignment_role = role
+                next_roles = remaining_roles
 
-                backtrack(index + 1, used_names, assignments)
+                if seeker["main"] == "BRD" and role in {"support", "puller"}:
+                    covered_role = "puller" if role == "support" else "support"
+
+                    if covered_role in remaining_roles:
+                        assignment_role = "support(puller)"
+                        next_roles = remaining_roles.copy()
+                        next_roles.remove(covered_role)
+                        next_roles.append("dd")
+
+                used_names.add(key)
+                assignments.append((assignment_role, seeker))
+
+                backtrack(next_roles, used_names, assignments)
 
                 assignments.pop()
                 used_names.remove(key)
 
-        backtrack(0, set(), [])
+        backtrack(roles_needed, set(), [])
 
     all_options.sort(
         key=lambda option: option["score"],
